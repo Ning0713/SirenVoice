@@ -1,0 +1,8 @@
+<resources>
+    <style name="Base.Theme.MainActivity" parent="Theme.Material3.DayNight">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">?attr/isLightTheme</item>
+    </style>
+
+    <style name="Theme.MainActivity" parent="Base.Theme.MainActivity" />
+</resources>

@@ -1,0 +1,44 @@
+[versions]
+agp = "8.3.0"
+kotlin = "1.9.22"
+libxposed-api = "100"
+libxposed-service = "100-1.0.0"
+org-jetbrains-kotlin-jvm = "1.9.20"
+java-websocket = "1.5.4"
+joor = "0.9.14"
+autox = "1.0.1"
+ksp = "1.9.22-1.0.17"
+gson = "2.10.1"
+protobuf-lib = "3.25.3"
+protobuf-plugin = "0.9.4"
+appcompat = "1.6.1"
+material = "1.11.0"
+activity = "1.8.0"
+constraintlayout = "2.1.4"
+libsu = "5.2.2"
+
+[libraries]
+libxposed-api = { module = "io.github.libxposed:api", version.ref = "libxposed-api" }
+libxposed-service = { module = "io.github.libxposed:service", version.ref = "libxposed-service" }
+java-websocket = { module = "org.java-websocket:Java-WebSocket", version.ref = "java-websocket" }
+joor = { module = "org.jooq:joor", version.ref = "joor" }
+autox-ksp = { module = "xyz.mufanc.autox:ksp", version.ref = "autox" }
+autox-annotation = { module = "xyz.mufanc.autox:annotation", version.ref = "autox" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+protobuf-protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf-lib" }
+protobuf-java = { module = "com.google.protobuf:protobuf-javalite", version.ref = "protobuf-lib" }
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+libsu-core = { module = "com.github.topjohnwu.libsu:core", version.ref = "libsu" }
+
+[plugins]
+com-android-application = { id = "com.android.application", version.ref = "agp" }
+com-android-library = { id = "com.android.library", version.ref = "agp" }
+org-jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+org-jetbrains-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "org-jetbrains-kotlin-jvm" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+
+[bundles]
