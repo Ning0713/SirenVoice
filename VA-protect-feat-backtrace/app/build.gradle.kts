@@ -23,8 +23,8 @@ fun String.exec(): String {
         .inputStream.bufferedReader().readText().trim()
 }
 
-val commitCount = 1  // "git rev-list --count HEAD".exec().toInt()
-val commitHash = "123456" //""git rev-parse --short HEAD".exec()
+val commitCount =  "git rev-list --count HEAD".exec().toInt()
+val commitHash = "git rev-parse --short HEAD".exec()
 
 android {
     namespace = "xyz.mufanc.vap"
