@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshUi() {
-        mDefenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", true)
+        mDefenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", false)
         mSwitch.isChecked = mDefenceEnabled
         Log.d(TAG, "Defence enabled: $mDefenceEnabled")
     }

