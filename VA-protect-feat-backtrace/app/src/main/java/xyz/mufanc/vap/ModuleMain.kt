@@ -28,9 +28,7 @@ class ModuleMain(
 
     private fun dispatchHook(pkg: String, cl: ClassLoader) {
         ClassHelper.init(cl)
-
         Log.xp(ixp)
-
         when (pkg) {
             "system" -> HookSystemServer(ixp)
             "com.miui.voicetrigger" -> HookVoiceTrigger(ixp)

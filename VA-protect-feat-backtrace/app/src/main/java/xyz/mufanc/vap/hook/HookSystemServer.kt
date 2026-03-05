@@ -74,12 +74,11 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
             }
 
             fun replay(extra: Bundle) {
-                Log.i(TAG, "🔴 REPLAY ATTACK - Injecting malicious bundle")
+                Log.i(TAG, "REPLAY ATTACK - Injecting malicious bundle")
                 val context = ctx ?: throw IllegalStateException("`this` object is not initialized or has been lost!")
                 
                 // 标记恶意 Bundle
                 WriteToParcelHook.mark(args[index]!!, extra)
-                
                 val defenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", false)
                 Log.i(TAG, "Defence status: $defenceEnabled")
                 
@@ -87,34 +86,15 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
                 isReplaying = true
                 
                 try {
-                    // 执行重放攻击 - 这会触发完整的事件传递链
-                    // Signal 35 会在 before() Hook 中发送（在 onPhraseRecognition 内部）
+                    // 执行重放攻击,触发完整的事件传递链
                     func.invoke(context, *args)
-                    Log.i(TAG, "Replay attack executed - event sent to VoiceTrigger")
-                    
-                    // 如果防御开启，等待 tombstone 分析完成
                     if (defenceEnabled) {
-                        Log.d(TAG, "Waiting for tombstone analysis...")
-                        Thread.sleep(2000)  // 等待 TombstoneObserver 分析并采取行动
-                        
-                        // 检查是否有新的 tombstone 文件
-                        val tombstoneDir = java.io.File("/data/tombstones")
-                        if (tombstoneDir.exists() && tombstoneDir.canRead()) {
-                            val recentFiles = tombstoneDir.listFiles()
-                                ?.filter { it.name.matches("tombstone_\\d{2}(\\.pb)?".toRegex()) }
-                                ?.sortedByDescending { it.lastModified() }
-                                ?.take(3)
-                            
-                            Log.d(TAG, "Recent tombstone files after replay:")
-                            recentFiles?.forEach { 
-                                Log.d(TAG, "  - ${it.name}: ${it.lastModified()} (${it.length()} bytes)")
-                            }
-                        }
+                        Log.i(TAG, "Replay blocked by defence system")
                     } else {
-                        Log.w(TAG, "Defence DISABLED - replay executed without verification")
+                        Log.i(TAG, "Replay attack executed - event sent to VoiceTrigger")
                     }
-                } catch (e: Throwable) {
-                    Log.e(TAG, "Replay attack failed", e)
+                } catch (err: Throwable) {
+                    Log.e(TAG, "Replay attack failed", err)
                 } finally {
                     isReplaying = false
                 }
@@ -133,7 +113,7 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
                 if (status == 0) {
                     if (!isCallFromReplay()) {
                         // 真实的硬件唤醒
-                        Log.i(TAG, "✅ Legitimate hardware trigger detected")
+                        Log.i(TAG, "Legitimate hardware trigger detected")
                         
                         // 保存上下文供重放使用
                         func = callback.member as Method
@@ -145,14 +125,30 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
                         Log.d(TAG, "Saved method: ${func.name}, context: ${ctx?.javaClass?.simpleName}")
                     } else {
                         // 重放攻击触发的调用
-                        Log.i(TAG, "🔴 Replay attack in progress (from replay() function)")
+                        Log.i(TAG, "Replay attack in progress (from replay() function)")
                         
-                        // 在这里发送 Signal 35，此时调用栈包含：
-                        // replay() -> func.invoke() -> onPhraseRecognition (当前位置)
-                        // 但不包含硬件层调用
                         val defenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", false)
                         if (defenceEnabled) {
-                            Log.d(TAG, "🛡️ Defence enabled - triggering Signal 35 in onPhraseRecognition")
+                            Log.i(TAG, "")
+                            Log.i(TAG, "DEFENCE ENABLED")
+                            Log.i(TAG, "")
+                            
+                            // 执行防御
+                            try {
+                                Log.i(TAG, "Calling TextVerifier.warnUser()...")
+                                xyz.mufanc.vap.util.TextVerifier.warnUser()
+                                Log.i(TAG, "warnUser() completed")
+                                
+                                Log.i(TAG, "Calling TextVerifier.forceStopPackage()...")
+                                xyz.mufanc.vap.util.TextVerifier.forceStopPackage()
+                                Log.i(TAG, "forceStopPackage() completed")
+                                Log.i(TAG, "REPLAY ATTACK BLOCKED SUCCESSFULLY")
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "FAILED to block replay attack", e)
+                            }
+                            
+                            // 发送 Signal 35 用于 tombstone 分析
+                            Log.d(TAG, "Also triggering Signal 35 for tombstone analysis")
                             try {
                                 val pid = android.os.Process.myPid()
                                 val tid = Os.gettid()
@@ -160,16 +156,19 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
                                 
                                 Os.kill(tid, 35)
                                 Log.d(TAG, "Signal 35 sent successfully")
-                                
-                                // 等待 tombstone 文件生成完成
+
                                 Thread.sleep(500)
                             } catch (e: Throwable) {
                                 Log.e(TAG, "Failed to send Signal 35", e)
                             }
+
+                            Log.i(TAG, "Skipping original method execution to block attack chain")
+                            callback.returnAndSkip(null)
+                        } else {
+                            Log.w(TAG, "Defence DISABLED - replay attack proceeding without blocking")
                         }
                     }
                 }
-
                 return OnPhraseRecognitionHook()
             }
         }
@@ -226,17 +225,16 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
             }
         }
 
-        Log.i(TAG, "Posting TombstoneObserver.install() to main looper...")
+        Log.i(TAG, "Posting TombstoneObserver.install() to main looper")
         Handler(Looper.getMainLooper()).post {
-            Log.i(TAG, ">>> Main looper handler executed, calling TombstoneObserver.install()...")
+            Log.i(TAG, "Main looper handler executed, calling TombstoneObserver.install()")
             try {
                 TombstoneObserver.install()
-                Log.i(TAG, ">>> TombstoneObserver.install() returned successfully")
+                Log.i(TAG, "TombstoneObserver.install() returned successfully")
             } catch (e: Throwable) {
-                Log.e(TAG, "!!! TombstoneObserver.install() FAILED !!!", e)
+                Log.e(TAG, "TombstoneObserver.install() FAILED", e)
             }
         }
-        
         Log.i(TAG, "HookSystemServer initialization completed")
     }
 }

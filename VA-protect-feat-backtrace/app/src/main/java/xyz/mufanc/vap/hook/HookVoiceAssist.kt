@@ -77,7 +77,6 @@ class HookVoiceAssist(ixp: XposedInterface): HookBase(ixp) {
     }
 
     private fun handleMessage(message: Bundle) {
-        // 解析数据到内存，避免输出 Bundle[mParcelledData.dataSize=40] 之类意义不明的内容
         Reflect.on(message).call("unparcel")
 
         Log.i(TAG, "message: $message")

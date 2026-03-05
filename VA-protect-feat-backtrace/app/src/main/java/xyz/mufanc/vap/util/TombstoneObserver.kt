@@ -33,21 +33,19 @@ class TombstoneObserver private constructor() : FileObserver(TARGET_DIR, EVENTS)
         )
 
         fun install() {
-            Log.i(TAG, "========================================")
             Log.i(TAG, "TombstoneObserver.install() CALLED")
-            Log.i(TAG, "========================================")
             
             observer = TombstoneObserver()
             Log.i(TAG, "TombstoneObserver instance created")
             
             val dir = File(TARGET_DIR)
             if (!dir.exists()) {
-                Log.w(TAG, "!!! Tombstone directory does not exist: $TARGET_DIR")
+                Log.w(TAG, "Tombstone directory does not exist: $TARGET_DIR")
                 return
             }
             
             if (!dir.canRead()) {
-                Log.w(TAG, "!!! Cannot read tombstone directory: $TARGET_DIR")
+                Log.w(TAG, "Cannot read tombstone directory: $TARGET_DIR")
                 return
             }
             
@@ -82,9 +80,7 @@ class TombstoneObserver private constructor() : FileObserver(TARGET_DIR, EVENTS)
             }
 
             Log.i(TAG, "File observer events: ${names.joinToString(", ")}")
-            Log.i(TAG, "========================================")
             Log.i(TAG, "TombstoneObserver.install() COMPLETED")
-            Log.i(TAG, "========================================")
         }
     }
 
@@ -185,9 +181,7 @@ class TombstoneObserver private constructor() : FileObserver(TARGET_DIR, EVENTS)
     }
 
     private fun handleTextTombstone(file: File) {
-        Log.i(TAG, "========================================")
         Log.i(TAG, "[STEP 1] handleTextTombstone() START")
-        Log.i(TAG, "========================================")
         
         try {
             val content = file.readText()
@@ -255,10 +249,8 @@ class TombstoneObserver private constructor() : FileObserver(TARGET_DIR, EVENTS)
         } catch (e: Throwable) {
             Log.e(TAG, "!!! Error in handleTextTombstone !!!", e)
         }
-        
-        Log.i(TAG, "========================================")
+
         Log.i(TAG, "[STEP 1] handleTextTombstone() END")
-        Log.i(TAG, "========================================")
     }
     
     private fun startPolling() {
@@ -270,8 +262,8 @@ class TombstoneObserver private constructor() : FileObserver(TARGET_DIR, EVENTS)
             while (isRunning) {
                 try {
                     cycleCount++
-                    if (cycleCount % 10 == 0) {
-                        Log.i(TAG, "Polling thread alive: cycle $cycleCount")
+                    if (cycleCount % 100 == 0) {
+                        Log.d(TAG, "Polling thread alive: cycle $cycleCount")
                     }
                     
                     Thread.sleep(200)  // 200ms 检查一次，快速响应
@@ -291,11 +283,10 @@ class TombstoneObserver private constructor() : FileObserver(TARGET_DIR, EVENTS)
                         continue
                     }
                     
-                    var foundNew = false
                     val files = dir.listFiles()
                     
                     if (files == null) {
-                        if (cycleCount % 50 == 0) {
+                        if (cycleCount % 500 == 0) {
                             Log.w(TAG, "listFiles() returned null")
                         }
                         continue
@@ -310,7 +301,6 @@ class TombstoneObserver private constructor() : FileObserver(TARGET_DIR, EVENTS)
                                 
                                 // 如果时间戳不同，说明是新文件或被修改过
                                 if (savedTs == null || savedTs != currentTs) {
-                                    foundNew = true
                                     Log.i(TAG, ">>> Polling detected new/modified tombstone: ${file.name}")
                                     Log.i(TAG, "    savedTs=$savedTs, currentTs=$currentTs")
                                     
@@ -322,16 +312,12 @@ class TombstoneObserver private constructor() : FileObserver(TARGET_DIR, EVENTS)
                             }
                         }
                     }
-                    
-                    if (cycleCount % 50 == 0 && !foundNew) {
-                        Log.d(TAG, "Polling cycle $cycleCount: no new tombstones")
-                    }
                 } catch (err: Throwable) {
-                    Log.e(TAG, "!!! Polling error !!!", err)
+                    Log.e(TAG, "Polling error", err)
                 }
             }
             
-            Log.i(TAG, "=== Polling thread STOPPED ===")
+            Log.i(TAG, "Polling thread STOPPED")
         }
     }
 }

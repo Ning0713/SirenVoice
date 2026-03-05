@@ -149,7 +149,6 @@ class HookVoiceTrigger(ixp: XposedInterface): HookBase(ixp) {
                         val intent = android.content.Intent(Constants.ACTION_START_VOICEASSIST)
                         intent.setPackage("com.miui.voiceassist")
                         intent.setClassName("com.miui.voiceassist", "com.xiaomi.voiceassistant.VoiceService")
-                        
                         // 使用 startService 启动服务
                         // 这会触发 StartServiceHook，将恶意 Bundle 注入到 Intent 中
                         context.startService(intent)
