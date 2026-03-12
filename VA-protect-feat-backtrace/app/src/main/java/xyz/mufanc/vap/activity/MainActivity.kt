@@ -2,15 +2,16 @@ package xyz.mufanc.vap.activity
 
 import android.os.Bundle
 import android.os.SystemProperties
-import androidx.activity.enableEdgeToEdge
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SwitchCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import com.topjohnwu.superuser.Shell
 import xyz.mufanc.vap.BuildConfig
 import xyz.mufanc.vap.R
 import xyz.mufanc.vap.util.Log
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,18 +29,16 @@ class MainActivity : AppCompatActivity() {
 
     private var mDefenceEnabled = false
     private lateinit var mSwitch: SwitchCompat
+    private lateinit var mStatusText: TextView
+    private lateinit var mTotalAttacks: TextView
+    private lateinit var mBlockedAttacks: TextView
+    private lateinit var mLastAttackTime: TextView
+    private lateinit var mVersionText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        enableEdgeToEdge()
-
         setContentView(R.layout.activity_main)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
 
         Shell.getShell { shell ->
             Log.d(TAG, "main shell: $shell")
@@ -50,7 +49,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Initialize views
         mSwitch = findViewById(R.id.switch_btn)
+        mStatusText = findViewById(R.id.status_text)
+        mTotalAttacks = findViewById(R.id.total_attacks)
+        mBlockedAttacks = findViewById(R.id.blocked_attacks)
+        mLastAttackTime = findViewById(R.id.last_attack_time)
+        mVersionText = findViewById(R.id.version_text)
+
+        // Set version
+        mVersionText.text = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})"
+
         mSwitch.setOnCheckedChangeListener { _, isChecked ->
             if (mDefenceEnabled != isChecked) {
                 Log.i(TAG, "Switch changed to: $isChecked")
@@ -71,12 +80,47 @@ class MainActivity : AppCompatActivity() {
                 refreshUi()
             }
         }
+        
         refreshUi()
+        loadStatistics()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshUi()
+        loadStatistics()
     }
 
     private fun refreshUi() {
         mDefenceEnabled = SystemProperties.getBoolean("debug.vap.defence.enable", false)
         mSwitch.isChecked = mDefenceEnabled
+        
+        if (mDefenceEnabled) {
+            mStatusText.text = "已启用"
+            mStatusText.setTextColor(getColor(android.R.color.holo_green_dark))
+        } else {
+            mStatusText.text = "已禁用"
+            mStatusText.setTextColor(getColor(android.R.color.holo_red_dark))
+        }
+        
         Log.d(TAG, "Defence enabled: $mDefenceEnabled")
+    }
+
+    private fun loadStatistics() {
+        val totalAttacks = xyz.mufanc.vap.util.AttackStatistics.getTotalAttacks()
+        val blockedAttacks = xyz.mufanc.vap.util.AttackStatistics.getBlockedAttacks()
+        val lastAttackTime = xyz.mufanc.vap.util.AttackStatistics.getLastAttackTime()
+
+        mTotalAttacks.text = totalAttacks.toString()
+        mBlockedAttacks.text = blockedAttacks.toString()
+
+        if (lastAttackTime > 0) {
+            val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            mLastAttackTime.text = dateFormat.format(Date(lastAttackTime))
+        } else {
+            mLastAttackTime.text = "无"
+        }
+
+        Log.d(TAG, "Statistics loaded: total=$totalAttacks, blocked=$blockedAttacks")
     }
 }

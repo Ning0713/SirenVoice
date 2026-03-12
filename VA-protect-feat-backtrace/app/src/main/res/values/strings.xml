@@ -1,4 +1,25 @@
 <resources>
     <string name="app_name">VA Protect</string>
     <string name="activity_label">语音防御</string>
+    
+    <!-- Defence UI -->
+    <string name="defence_title">CrossUnwind 防御系统</string>
+    <string name="defence_status">防御状态</string>
+    <string name="defence_enabled">已启用</string>
+    <string name="defence_disabled">已禁用</string>
+    <string name="attack_statistics">攻击统计</string>
+    <string name="total_attacks">总攻击次数</string>
+    <string name="blocked_attacks">已拦截</string>
+    <string name="last_attack_time">最近攻击时间</string>
+    <string name="view_details">查看详情</string>
+    <string name="clear_logs">清除日志</string>
+    
+    <!-- Notification -->
+    <string name="notification_channel_name">语音防御模块</string>
+    <string name="notification_channel_desc">检测并拦截语音重放攻击</string>
+    <string name="notification_title">🛡️ 重放攻击已拦截</string>
+    <string name="notification_text">检测到恶意语音唤醒，已自动阻止</string>
+    <string name="notification_big_text">攻击类型: VoiceEar 重放攻击\n检测方法: 调用栈分析\n状态: 已成功拦截</string>
+    <string name="notification_action_details">查看详情</string>
+    <string name="notification_action_ignore">忽略</string>
 </resources>

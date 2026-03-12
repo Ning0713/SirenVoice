@@ -133,6 +133,15 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
                             Log.i(TAG, "DEFENCE ENABLED")
                             Log.i(TAG, "")
                             
+                            // 记录攻击统计
+                            try {
+                                Log.i(TAG, "Recording attack statistics (blocked=true)...")
+                                xyz.mufanc.vap.util.AttackStatistics.recordAttack(blocked = true)
+                                Log.i(TAG, "Attack statistics recorded successfully")
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "Failed to record attack statistics", e)
+                            }
+                            
                             // 执行防御
                             try {
                                 Log.i(TAG, "Calling TextVerifier.warnUser()...")
@@ -166,6 +175,15 @@ class HookSystemServer(ixp: XposedInterface) : HookBase(ixp) {
                             callback.returnAndSkip(null)
                         } else {
                             Log.w(TAG, "Defence DISABLED - replay attack proceeding without blocking")
+                            
+                            // 记录未拦截的攻击
+                            try {
+                                Log.i(TAG, "Recording attack statistics (blocked=false)...")
+                                xyz.mufanc.vap.util.AttackStatistics.recordAttack(blocked = false)
+                                Log.i(TAG, "Attack statistics recorded successfully")
+                            } catch (e: Throwable) {
+                                Log.e(TAG, "Failed to record attack statistics", e)
+                            }
                         }
                     }
                 }
